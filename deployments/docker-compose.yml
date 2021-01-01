@@ -1,0 +1,21 @@
+
+version: "3.3"
+
+services: 
+  backend:
+    build: ../build/go/
+    ports: 
+      - "3000:3000"
+    volumes: 
+      - "../:/go/src/app"
+      - "../build/go/pkg/:/go/pkg/"
+    tty: true
+  
+  store:
+    image: postgres:12
+    environment:
+      POSTGRES_PASSWORD: qwerty
+    ports:
+      - "5432:5432"
+    volumes: 
+      - "../build/db:/var/lib/postgresql/data/"
