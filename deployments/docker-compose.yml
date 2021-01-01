@@ -19,3 +19,12 @@ services:
       - "5432:5432"
     volumes: 
       - "../build/db:/var/lib/postgresql/data/"
+
+  nginx:
+    build: ../build/nginx
+    tty: true
+    ports: 
+      - "80:80"
+    volumes: 
+      - "../build/nginx/files:/app/files"
+      - "../build/nginx/site.conf:/etc/nginx/conf.d/default.conf"
