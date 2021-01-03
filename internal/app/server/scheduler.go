@@ -5,11 +5,9 @@ import (
 	"log"
 
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/Vysogota99/unit-merchant-experience/internal/app/data"
-	"github.com/gin-gonic/gin"
 )
 
 const (
@@ -19,91 +17,101 @@ const (
 	STATUS_VALIDATE      = "В данный момент происходит валидация данных"
 	STATUS_SUCCESS       = "Готово"
 	STATUS_ERR           = "Ошибка"
+	STATUS_SLEEP         = "Спит"
 )
 
 type scheduler struct {
-	nWorkers       int
-	workerID       int64
-	nActiveWorkers int64
-	workers        map[int64]*worker
-	mu             sync.Mutex
+	nWorkers int
+	mu       sync.Mutex
+	workers  map[int]*worker
+	tasks    chan *task
 }
 
 type worker struct {
-	id     int64
+	id     int
 	status chan string
 	result chan string
+}
+
+type task struct {
+	ownerID  int
+	url      string
+	workerID chan int
 }
 
 func newScheduler(n int) *scheduler {
 	return &scheduler{
 		nWorkers: n,
-		workers:  make(map[int64]*worker),
+		workers:  make(map[int]*worker),
+		tasks:    make(chan *task),
 	}
 }
 
+func (s *scheduler) initPull() {
+	for i := 0; i < s.nWorkers; i++ {
+		worker := worker{
+			id:     i,
+			status: make(chan string, 1),
+			result: make(chan string),
+		}
 
-
-func (s *scheduler) worker(c *gin.Context, url string, ownerID int, status chan string, result chan string, workerID chan<- int64) {
-	atomic.AddInt64(&s.nActiveWorkers, 1)
-	defer atomic.AddInt64(&s.nActiveWorkers, -1)
-
-	s.mu.Lock()
-
-	s.workerID++
-	worker := &worker{
-		id:     s.workerID,
-		status: status,
-		result: result,
+		worker.status <- STATUS_SLEEP
+		s.workers[i] = &worker
+		go worker.start(&s.tasks)
 	}
-
-	tmpWorkerID := s.workerID
-	s.workers[tmpWorkerID] = worker
-	defer delete(s.workers, tmpWorkerID)
-
-	s.mu.Unlock()
-
-	log.Printf("Активных воркеров: %d\n", s.nActiveWorkers)
-	workerID <- worker.id
-	status <- STATUS_DOWNLOAD_FILE
-
-	filePath := fmt.Sprintf("../static/%d_%d.xlsx", time.Now().Unix(), ownerID)
-	if err := data.DownloadFile(filePath, url); err != nil {
-		updateStatus(&s.mu, status, STATUS_ERR)
-		result <- err.Error()
-		return
-	}
-
-	updateStatus(&s.mu, status, STATUS_PARSE_FILE)
-
-	dataToValidate, err := data.ReadXLSX(filePath)
-	if err != nil {
-		updateStatus(&s.mu, status, STATUS_ERR)
-		result <- err.Error()
-		return
-	}
-	time.Sleep(time.Second * 5)
-
-	updateStatus(&s.mu, status, STATUS_VALIDATE)
-
-	dataToDB, err := data.Validate(dataToValidate)
-	if err != nil {
-		updateStatus(&s.mu, status, STATUS_ERR)
-		result <- err.Error()
-		return
-	}
-
-	time.Sleep(time.Second * 5)
-
-	updateStatus(&s.mu, status, STATUS_SUCCESS)
-	result <- fmt.Sprintf("%v", dataToDB)
-	log.Printf("Горутина %d завершила работу\n", tmpWorkerID)
 }
 
-// updateStatus - обновляет статус worker-а в канале
-func updateStatus(mu *sync.Mutex, status chan string, newStatus string) {
-	mu.Lock()
-	defer mu.Unlock()
-	<-status
-	status <- newStatus
+// start - запускает определенный воркер. В качестве аргумента принимает указатель на канал с указателем на задачу.
+//			Таким образом все worker-ы ссылаются на один канал и берут оттуда задчи. При получении task, ворвер сразу
+//			сохраняет в него свой id, для того, чтобы по нему получить результаты работы из map workers
+func (w *worker) start(tasks *chan *task) {
+	for task := range *tasks {
+		log.Printf("Worker #%d начал работу", w.id)
+
+		task.workerID <- w.id
+
+		w.updateStatus(STATUS_DOWNLOAD_FILE)
+
+		filePath := fmt.Sprintf("../static/%d_%d.xlsx", time.Now().Unix(), task.ownerID)
+		if err := data.DownloadFile(filePath, task.url); err != nil {
+			w.updateStatus(STATUS_ERR)
+			w.result <- err.Error()
+			log.Printf("Worker #%d закончил работу с ошибкой: %s", w.id, err.Error())
+
+			w.updateStatus(STATUS_SLEEP)
+			continue
+		}
+
+		w.updateStatus(STATUS_PARSE_FILE)
+		dataToValidate, err := data.ReadXLSX(filePath)
+		if err != nil {
+			w.updateStatus(STATUS_ERR)
+			w.result <- err.Error()
+			log.Printf("Worker #%d закончил работу с ошибкой: %s", w.id, err.Error())
+
+			w.updateStatus(STATUS_SLEEP)
+			continue
+		}
+
+		w.updateStatus(STATUS_DB)
+		dataToDB, err := data.Validate(dataToValidate)
+		if err != nil {
+			w.updateStatus(STATUS_ERR)
+			w.result <- err.Error()
+			log.Printf("Worker #%d закончил работу с ошибкой: %s", w.id, err.Error())
+
+			w.updateStatus(STATUS_SLEEP)
+			continue
+		}
+
+		w.updateStatus(STATUS_SUCCESS)
+		log.Println(dataToDB)
+		log.Printf("Worker #%d закончил работу успешно", w.id)
+	}
+}
+
+// updateStatus - обновляет статус worker-а
+func (w *worker) updateStatus(newStatus string) {
+	<-w.status
+	w.status <- newStatus
 }

@@ -1,7 +1,6 @@
 package data
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -87,11 +86,13 @@ func Validate(dataToValidate []models.RowString) ([]models.Row, error) {
 		data := models.Row{}
 		value, err := strconv.ParseInt(row.OfferID, 10, 64)
 		if err != nil {
-			return nil, err
+			data.ISValid = false
+			continue
 		}
 
 		if value <= 0 {
-			return nil, fmt.Errorf("Индекс товара должен быть положительным")
+			data.ISValid = false
+			continue
 		}
 
 		data.OfferID = int(value)
@@ -99,32 +100,38 @@ func Validate(dataToValidate []models.RowString) ([]models.Row, error) {
 
 		valueFloat, err := strconv.ParseFloat(row.Price, 64)
 		if err != nil {
-			return nil, err
+			data.ISValid = false
+			continue
 		}
 
 		if valueFloat <= 0 {
-			return nil, fmt.Errorf("цена должна быть положительной")
+			data.ISValid = false
+			continue
 		}
 
 		data.Price = valueFloat
 
 		value, err = strconv.ParseInt(row.Quantity, 10, 64)
 		if err != nil {
-			return nil, err
+			data.ISValid = false
+			continue
 		}
 
 		if value < 0 {
-			return nil, fmt.Errorf("Количество товаров не может быть отрицательным")
+			data.ISValid = false
+			continue
 		}
 
 		data.Quantity = int(value)
 
 		valueBool, err := strconv.ParseBool(row.Available)
 		if err != nil {
-			return nil, err
+			data.ISValid = false
+			continue
 		}
-		data.Available = valueBool
 
+		data.Available = valueBool
+		data.ISValid = true
 		result[i] = data
 	}
 	return result, nil

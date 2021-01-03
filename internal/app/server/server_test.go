@@ -24,6 +24,7 @@ const (
 func TestFilehandler(t *testing.T) {
 	var store store.Store = postgres.New(connStringPostgres)
 	scheduler := newScheduler(nWorkers)
+	scheduler.initPull()
 	router := NewRouter(serverPort, store, scheduler)
 
 	w := httptest.NewRecorder()

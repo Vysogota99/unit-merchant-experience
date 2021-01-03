@@ -7,6 +7,7 @@ type Row struct {
 	Price     float64
 	Quantity  int
 	Available bool
+	ISValid   bool
 }
 
 // RowString ...

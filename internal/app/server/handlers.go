@@ -20,14 +20,16 @@ func (r *Router) fileHandler(c *gin.Context) {
 		return
 	}
 
-	resChan := make(chan string, 1)
-	statusChan := make(chan string, 1)
-	workerIDChan := make(chan int64)
-	go r.scheduler.worker(c, req.URL, req.ID, resChan, statusChan, workerIDChan)
+	task := task{
+		url:      req.URL,
+		ownerID:  req.ID,
+		workerID: make(chan int),
+	}
 
-	workerID := <-workerIDChan
-	respond(c, http.StatusAccepted, map[string]int64{
-		"id": workerID,
+	r.scheduler.tasks <- &task
+	workerID := <-task.workerID
+	respond(c, http.StatusAccepted, map[string]int{
+		"ID задачи": workerID,
 	}, "")
 }
 
@@ -43,9 +45,9 @@ func (r *Router) fileStatusHandler(c *gin.Context) {
 		respond(c, http.StatusInternalServerError, nil, err.Error())
 		return
 	}
-	worker, exist := r.scheduler.workers[int64(idInt)]
+	worker, exist := r.scheduler.workers[int(idInt)]
 	if !exist {
-		respond(c, http.StatusNotFound, nil, "горутины с таким id не существует")
+		respond(c, http.StatusNotFound, nil, "задачи с таким id не существует")
 		return
 	}
 
@@ -56,16 +58,12 @@ func (r *Router) fileStatusHandler(c *gin.Context) {
 
 	r.scheduler.mu.Unlock()
 
-	if status == STATUS_SUCCESS {
-		result := <-worker.result
-		respond(c, http.StatusAccepted, map[string]string{
+	if status == STATUS_ERR {
+		respond(c, http.StatusInternalServerError, map[string]string{
 			"status": status,
-			"result": result,
+			"result": <-worker.result,
 		}, "")
-		return
-	} else if status == STATUS_ERR {
-		result := <-worker.result
-		respond(c, http.StatusBadRequest, nil, result)
+
 		return
 	}
 
@@ -73,6 +71,7 @@ func (r *Router) fileStatusHandler(c *gin.Context) {
 		"status": status,
 	}, "")
 }
+
 func respond(c *gin.Context, code int, result interface{}, err string) {
 	if err == "EOF" {
 		result = "Неправильное тело запроса"

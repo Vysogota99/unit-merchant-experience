@@ -24,6 +24,7 @@ func NewServer(conf *Config) (*Server, error) {
 
 // Start - start the server
 func (s *Server) Start() error {
+	s.scheduler.initPull()
 	s.initRouter()
 	s.router.Setup().Run(s.Conf.serverPort)
 	return nil
