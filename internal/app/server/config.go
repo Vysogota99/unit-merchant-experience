@@ -3,12 +3,14 @@ package server
 import (
 	"fmt"
 	"os"
+	"strconv"
 )
 
 // Config ...
 type Config struct {
-	ServerPort      string
-	DBConnString    string
+	serverPort   string
+	dbConnString string
+	nWorkers     int
 }
 
 // NewConfig - helper to init config
@@ -23,8 +25,19 @@ func NewConfig() (*Config, error) {
 		return nil, fmt.Errorf("No DB_CONN_STRING in .env")
 	}
 
+	nWorkersStr, exists := os.LookupEnv("NUMBER_OF_WORKERS")
+	if !exists {
+		return nil, fmt.Errorf("No NUMBER_OF_WORKERS in .env")
+	}
+
+	nWorkers, err := strconv.Atoi(nWorkersStr)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
-		ServerPort:      serverPort,
-		DBConnString:    dbConnString,
+		serverPort:   serverPort,
+		dbConnString: dbConnString,
+		nWorkers:     nWorkers,
 	}, nil
 }
