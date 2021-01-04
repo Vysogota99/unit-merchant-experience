@@ -25,7 +25,8 @@ func NewRouter(serverPort string, store store.Store, scheduler *scheduler) *Rout
 
 // Setup - найстройка роутера
 func (r *Router) Setup() *gin.Engine {
-	r.router.POST("/file", r.fileHandler)
+	r.router.POST("/offer", r.offerHandler)
+	r.router.GET("/offer", r.getOfferHandler)
 	r.router.GET("/status/:id", r.fileStatusHandler)
 	return r.router
 }

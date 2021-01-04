@@ -17,13 +17,12 @@ import (
 
 const (
 	serverPort         = ":8081"
-	connStringPostgres = "user=user password=password dbname=app sslmode=disable"
+	connStringPostgres = "user=user1 password=password dbname=app sslmode=disable"
 	nWorkers           = 10
 )
 
 func TestFilehandler(t *testing.T) {
 	db, err := sql.Open("postgres", connStringPostgres)
-	assert.NoError(t, err)
 	store := postgres.New(db)
 
 	scheduler := newScheduler(nWorkers, store)
@@ -34,13 +33,13 @@ func TestFilehandler(t *testing.T) {
 
 	data := map[string]interface{}{
 		"id":  1,
-		"url": "http://nginx:80/files/1.xlsx",
+		"url": "http://127.0.0.1:80/files/1.xlsx",
 	}
 
 	body, err := json.Marshal(data)
 	assert.NoError(t, err)
 
-	req, _ := http.NewRequest("POST", "/file", bytes.NewBuffer(body))
+	req, _ := http.NewRequest("POST", "/offer", bytes.NewBuffer(body))
 	router.Setup().ServeHTTP(w, req)
 	assert.Equal(t, http.StatusAccepted, req.Response.StatusCode)
 }

@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS offers (
-    id serial PRIMARY KEY,
+    id int PRIMARY KEY,
     saler_id int NOT NULL,
     name varchar(255) NOT NULL,
     price numeric NOT NULL,

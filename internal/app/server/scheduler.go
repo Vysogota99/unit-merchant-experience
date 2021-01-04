@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Vysogota99/unit-merchant-experience/internal/app/data"
+	"github.com/Vysogota99/unit-merchant-experience/internal/app/models"
 	"github.com/Vysogota99/unit-merchant-experience/internal/app/store"
 )
 
@@ -32,7 +33,7 @@ type scheduler struct {
 type worker struct {
 	id     int
 	status chan string
-	result chan string
+	result chan *models.WorkerResult
 	store  store.Store
 }
 
@@ -56,10 +57,11 @@ func (s *scheduler) initPull() {
 		worker := worker{
 			id:     i,
 			status: make(chan string, 1),
-			result: make(chan string),
+			result: make(chan *models.WorkerResult),
 			store:  s.store,
 		}
 
+		log.Printf("Стартовал воркер #%d", i)
 		worker.status <- STATUS_SLEEP
 		s.workers[i] = &worker
 		go worker.start(&s.tasks)
@@ -77,24 +79,11 @@ func (w *worker) start(tasks *chan *task) {
 
 		w.updateStatus(STATUS_DOWNLOAD_FILE)
 
-		ids, err := w.store.Offer().GetOffersIDSBySalerID(task.ownerID)
-		if err != nil {
-			w.updateStatus(STATUS_ERR)
-			w.result <- err.Error()
-			log.Printf("Worker #%d закончил работу с ошибкой: %s", w.id, err.Error())
-
-			w.updateStatus(STATUS_SLEEP)
-			continue
-		}
-
-		log.Println(ids)
-		
-
 		filePath := fmt.Sprintf("../static/%d_%d.xlsx", time.Now().Unix(), task.ownerID)
 		if err := data.DownloadFile(filePath, task.url); err != nil {
 			w.updateStatus(STATUS_ERR)
-			w.result <- err.Error()
 			log.Printf("Worker #%d закончил работу с ошибкой: %s", w.id, err.Error())
+			w.result <- nil
 
 			w.updateStatus(STATUS_SLEEP)
 			continue
@@ -104,8 +93,8 @@ func (w *worker) start(tasks *chan *task) {
 		dataToValidate, err := data.ReadXLSX(filePath)
 		if err != nil {
 			w.updateStatus(STATUS_ERR)
-			w.result <- err.Error()
 			log.Printf("Worker #%d закончил работу с ошибкой: %s", w.id, err.Error())
+			w.result <- nil
 
 			w.updateStatus(STATUS_SLEEP)
 			continue
@@ -113,18 +102,40 @@ func (w *worker) start(tasks *chan *task) {
 
 		w.updateStatus(STATUS_VALIDATE)
 
-		dataToDB, err := data.Validate(dataToValidate)
+		ids, err := w.store.Offer().GetOffersIDSBySalerID(task.ownerID)
 		if err != nil {
 			w.updateStatus(STATUS_ERR)
-			w.result <- err.Error()
 			log.Printf("Worker #%d закончил работу с ошибкой: %s", w.id, err.Error())
+			w.result <- nil
 
 			w.updateStatus(STATUS_SLEEP)
 			continue
 		}
 
+		rowsToInsert, rowsToUpdate, idsToDelete, nErrors := data.Validate(dataToValidate, ids)
+
+		// запись результатов в бд
+		w.updateStatus(STATUS_DB)
+
+		log.Println("ids: ", ids)
+		log.Println("ins: ", rowsToInsert)
+		log.Println("upd: ", rowsToUpdate)
+		log.Println("del: ", idsToDelete)
+
+		result, err := w.store.Offer().WorkerPipeline(rowsToInsert, rowsToUpdate, idsToDelete, task.ownerID)
+		if err != nil {
+			w.updateStatus(STATUS_ERR)
+			log.Printf("Worker #%d закончил работу с ошибкой: %s", w.id, err.Error())
+			w.result <- nil
+
+			w.updateStatus(STATUS_SLEEP)
+			continue
+		}
+
+		result.NWithErrors = nErrors
+
 		w.updateStatus(STATUS_SUCCESS)
-		log.Println(dataToDB)
+		w.result <- result
 		log.Printf("Worker #%d закончил работу успешно", w.id)
 	}
 }

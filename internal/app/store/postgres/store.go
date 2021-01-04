@@ -4,7 +4,6 @@ import (
 	"database/sql"
 
 	"github.com/Vysogota99/unit-merchant-experience/internal/app/store"
-	_ "github.com/lib/pq"
 )
 
 // StorePSQL ...

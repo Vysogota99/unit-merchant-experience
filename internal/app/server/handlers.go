@@ -1,14 +1,16 @@
 package server
 
 import (
+	"context"
+	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
-// fileHandler - обрабатывает файлы с данными о товарах
-func (r *Router) fileHandler(c *gin.Context) {
+// offerHandler - обрабатывает файлы с данными о товарах
+func (r *Router) offerHandler(c *gin.Context) {
 	type request struct {
 		ID  int    `json:"id" binding:"required"`
 		URL string `json:"url" binding:"required"`
@@ -33,6 +35,20 @@ func (r *Router) fileHandler(c *gin.Context) {
 	}, "")
 }
 
+func (r *Router) getOfferHandler(c *gin.Context) {
+	offerID := c.Query("offer_id")
+	salerID := c.Query("saler_id")
+	offer := c.Query("offer")
+
+	result, err := r.store.Offer().GetOffers(context.Background(), offerID, salerID, offer)
+	if err != nil {
+		respond(c, http.StatusInternalServerError, "", err.Error())
+		return
+	}
+
+	respond(c, http.StatusOK, result, "")
+}
+
 func (r *Router) fileStatusHandler(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
@@ -53,23 +69,40 @@ func (r *Router) fileStatusHandler(c *gin.Context) {
 
 	r.scheduler.mu.Lock()
 
+	log.Printf("Получение статуса воркера #%d", idInt)
 	status := <-worker.status
-	worker.status <- status
+
+	// обновляем статус для успешно выполненного воркера, тем самым переводим его в
+	//	режим ожидания новой задачи
+	if status == STATUS_SUCCESS {
+		worker.status <- STATUS_SLEEP
+	} else {
+		worker.status <- status
+	}
+	log.Printf("статус воркера #%d: %s", idInt, status)
 
 	r.scheduler.mu.Unlock()
 
 	if status == STATUS_ERR {
-		respond(c, http.StatusInternalServerError, map[string]string{
+		<-worker.result
+		respond(c, http.StatusInternalServerError, map[string]interface{}{
 			"status": status,
-			"result": <-worker.result,
 		}, "")
+	} else if status == STATUS_SLEEP {
+		respond(c, http.StatusOK, map[string]interface{}{
+			"status": status,
+		}, "")
+	} else if status == STATUS_SUCCESS {
 
-		return
+		respond(c, http.StatusAccepted, map[string]interface{}{
+			"status":     status,
+			"статистика": <-worker.result,
+		}, "")
+	} else {
+		respond(c, http.StatusProcessing, map[string]interface{}{
+			"status": status,
+		}, "")
 	}
-
-	respond(c, http.StatusAccepted, map[string]string{
-		"status": status,
-	}, "")
 }
 
 func respond(c *gin.Context, code int, result interface{}, err string) {

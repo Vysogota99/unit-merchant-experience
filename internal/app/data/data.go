@@ -4,6 +4,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
+
 	"strconv"
 
 	"github.com/Vysogota99/unit-merchant-experience/internal/app/models"
@@ -79,19 +81,25 @@ func ReadXLSX(fileName string) ([]models.RowString, error) {
 	return result, err
 }
 
-// Validate - приводит данные к нужным типам и проводит валидацию
-func Validate(dataToValidate []models.RowString) ([]models.Row, error) {
-	result := make([]models.Row, len(dataToValidate))
-	for i, row := range dataToValidate {
+// Validate - приводит данные к нужным типам и проводит валидацию. Вовзращает массив данных для
+//				добавления, для обновления и количество строк с ошибками.
+func Validate(dataToValidate []models.RowString, ids []int) ([]models.Row, []models.Row, []int, int) {
+	dataToInsert := make([]models.Row, 0)
+	idsToDelete := make([]int, 0)
+	dataToUpdate := make([]models.Row, 0)
+	dataWithErrors := 0
+
+	for _, row := range dataToValidate {
 		data := models.Row{}
+
 		value, err := strconv.ParseInt(row.OfferID, 10, 64)
 		if err != nil {
-			data.ISValid = false
+			dataWithErrors++
 			continue
 		}
 
 		if value <= 0 {
-			data.ISValid = false
+			dataWithErrors++
 			continue
 		}
 
@@ -100,12 +108,12 @@ func Validate(dataToValidate []models.RowString) ([]models.Row, error) {
 
 		valueFloat, err := strconv.ParseFloat(row.Price, 64)
 		if err != nil {
-			data.ISValid = false
+			dataWithErrors++
 			continue
 		}
 
 		if valueFloat <= 0 {
-			data.ISValid = false
+			dataWithErrors++
 			continue
 		}
 
@@ -113,12 +121,12 @@ func Validate(dataToValidate []models.RowString) ([]models.Row, error) {
 
 		value, err = strconv.ParseInt(row.Quantity, 10, 64)
 		if err != nil {
-			data.ISValid = false
+			dataWithErrors++
 			continue
 		}
 
 		if value < 0 {
-			data.ISValid = false
+			dataWithErrors++
 			continue
 		}
 
@@ -126,13 +134,47 @@ func Validate(dataToValidate []models.RowString) ([]models.Row, error) {
 
 		valueBool, err := strconv.ParseBool(row.Available)
 		if err != nil {
-			data.ISValid = false
+			dataWithErrors++
 			continue
 		}
 
 		data.Available = valueBool
-		data.ISValid = true
-		result[i] = data
+
+		// проверка на необходимость обновления
+		// если в списке с id товаров только один элемент - проверяем соответствие,
+		// иначе пользуемся поиском offer_id в этом списке
+
+		if len(ids) == 1 {
+			if ids[0] == data.OfferID {
+
+				// если строка подлежит удалению, сразу добавляем ее id
+				// в список для удаления
+				if data.Available == true {
+					dataToUpdate = append(dataToUpdate, data)
+				} else {
+					idsToDelete = append(idsToDelete, data.OfferID)
+				}
+
+				continue
+			}
+		} else {
+			if inSlice := sort.SearchInts(ids, data.OfferID); inSlice != len(ids) {
+
+				// если строка подлежит удалению, сразу добавляем ее id
+				// в список для удаления
+				if data.Available == true {
+					dataToUpdate = append(dataToUpdate, data)
+				} else {
+					idsToDelete = append(idsToDelete, data.OfferID)
+				}
+
+				continue
+			}
+		}
+
+		dataToInsert = append(dataToInsert, data)
+
 	}
-	return result, nil
+
+	return dataToInsert, dataToUpdate, idsToDelete, dataWithErrors
 }
