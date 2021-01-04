@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Vysogota99/unit-merchant-experience/internal/app/data"
+	"github.com/Vysogota99/unit-merchant-experience/internal/app/store"
 )
 
 const (
@@ -25,12 +26,14 @@ type scheduler struct {
 	mu       sync.Mutex
 	workers  map[int]*worker
 	tasks    chan *task
+	store    store.Store
 }
 
 type worker struct {
 	id     int
 	status chan string
 	result chan string
+	store  store.Store
 }
 
 type task struct {
@@ -39,11 +42,12 @@ type task struct {
 	workerID chan int
 }
 
-func newScheduler(n int) *scheduler {
+func newScheduler(n int, store store.Store) *scheduler {
 	return &scheduler{
 		nWorkers: n,
 		workers:  make(map[int]*worker),
 		tasks:    make(chan *task),
+		store:    store,
 	}
 }
 
@@ -53,6 +57,7 @@ func (s *scheduler) initPull() {
 			id:     i,
 			status: make(chan string, 1),
 			result: make(chan string),
+			store:  s.store,
 		}
 
 		worker.status <- STATUS_SLEEP
@@ -71,6 +76,19 @@ func (w *worker) start(tasks *chan *task) {
 		task.workerID <- w.id
 
 		w.updateStatus(STATUS_DOWNLOAD_FILE)
+
+		ids, err := w.store.Offer().GetOffersIDSBySalerID(task.ownerID)
+		if err != nil {
+			w.updateStatus(STATUS_ERR)
+			w.result <- err.Error()
+			log.Printf("Worker #%d закончил работу с ошибкой: %s", w.id, err.Error())
+
+			w.updateStatus(STATUS_SLEEP)
+			continue
+		}
+
+		log.Println(ids)
+		
 
 		filePath := fmt.Sprintf("../static/%d_%d.xlsx", time.Now().Unix(), task.ownerID)
 		if err := data.DownloadFile(filePath, task.url); err != nil {
@@ -93,7 +111,8 @@ func (w *worker) start(tasks *chan *task) {
 			continue
 		}
 
-		w.updateStatus(STATUS_DB)
+		w.updateStatus(STATUS_VALIDATE)
+
 		dataToDB, err := data.Validate(dataToValidate)
 		if err != nil {
 			w.updateStatus(STATUS_ERR)

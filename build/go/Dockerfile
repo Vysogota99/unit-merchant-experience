@@ -8,4 +8,4 @@ RUN apt-get update && apt-get install -y \
         net-tools 
 
 RUN go get -tags 'postgres' -u github.com/golang-migrate/migrate/cmd/migrate
-ENV POSTGRESQL_URL 'postgres://user:password@store:5432/app?sslmode=disable'
+ENV POSTGRESQL_URL 'postgres://user1:password@store:5432/app?sslmode=disable'

@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/Vysogota99/unit-merchant-experience/internal/app/data"
-	"github.com/Vysogota99/unit-merchant-experience/internal/app/store"
 	"github.com/Vysogota99/unit-merchant-experience/internal/app/store/postgres"
 	"github.com/stretchr/testify/assert"
 )
@@ -22,8 +22,11 @@ const (
 )
 
 func TestFilehandler(t *testing.T) {
-	var store store.Store = postgres.New(connStringPostgres)
-	scheduler := newScheduler(nWorkers)
+	db, err := sql.Open("postgres", connStringPostgres)
+	assert.NoError(t, err)
+	store := postgres.New(db)
+
+	scheduler := newScheduler(nWorkers, store)
 	scheduler.initPull()
 	router := NewRouter(serverPort, store, scheduler)
 

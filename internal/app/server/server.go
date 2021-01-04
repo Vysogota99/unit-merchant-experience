@@ -1,6 +1,8 @@
 package server
 
 import (
+	"database/sql"
+
 	"github.com/Vysogota99/unit-merchant-experience/internal/app/store"
 	"github.com/Vysogota99/unit-merchant-experience/internal/app/store/postgres"
 )
@@ -15,10 +17,16 @@ type Server struct {
 
 // NewServer - helper to init server
 func NewServer(conf *Config) (*Server, error) {
+	db, err := sql.Open("postgres", conf.dbConnString)
+	if err != nil {
+		return nil, err
+	}
+
+	store := postgres.New(db)
 	return &Server{
 		Conf:      conf,
-		Store:     postgres.New(conf.dbConnString),
-		scheduler: newScheduler(conf.nWorkers),
+		Store:     store,
+		scheduler: newScheduler(conf.nWorkers, store),
 	}, nil
 }
 
