@@ -7,7 +7,7 @@ type Row struct {
 	Name      string
 	Price     float64
 	Quantity  int
-	Available bool
+	Available bool `json:"available,omitempty"`
 }
 
 // RowString ...
