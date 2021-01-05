@@ -54,7 +54,15 @@ func (o *offerRepository) WorkerPipeline(rowsToInsert []models.Row, rowsToUpdate
 }
 
 func (o *offerRepository) GetOffers(ctx context.Context, offerID, salerID, offer string) ([]models.Row, error) {
-	return nil, nil
+	return []models.Row{
+		models.Row{
+			OfferID: 1,
+			SalerID: 2,
+			Name: "name",
+			Price: 123,
+			Quantity: 1,
+		},
+	}, nil
 }
 
 func arrayToString(a []int, delim string) string {

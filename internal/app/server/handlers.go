@@ -40,6 +40,31 @@ func (r *Router) getOfferHandler(c *gin.Context) {
 	salerID := c.Query("saler_id")
 	offer := c.Query("offer")
 
+	if offerID != "" {
+		res, err := strconv.ParseInt(offerID, 10, 64)
+		if err != nil {
+			respond(c, http.StatusUnprocessableEntity, "", err.Error())
+			return
+		}
+
+		if res < 0 {
+			respond(c, http.StatusUnprocessableEntity, "", "Порядковый номер не может быть меньше 0")
+			return
+		}
+	}
+
+	if salerID != "" {
+		res, err := strconv.ParseInt(salerID, 10, 64)
+		if err != nil {
+			respond(c, http.StatusUnprocessableEntity, "", err.Error())
+			return
+		}
+
+		if res < 0 {
+			respond(c, http.StatusUnprocessableEntity, "", "Порядковый номер не может быть меньше 0")
+			return
+		}
+	}
 	result, err := r.store.Offer().GetOffers(context.Background(), offerID, salerID, offer)
 	if err != nil {
 		respond(c, http.StatusInternalServerError, "", err.Error())

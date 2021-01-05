@@ -214,14 +214,12 @@ func (o *offerRepository) GetOffers(ctx context.Context, offerID, salerID, offer
 		}
 	}
 
-	if cap(predicats) == 0 {
+	if cap(predicats) == 1 {
 		query = fmt.Sprintf(query, "")
 	} else {
 		condition = fmt.Sprintf(condition, strings.Join(predicats, " AND "))
 		query = fmt.Sprintf(query, condition)
 	}
-
-	log.Println(query)
 
 	rows, err := tx.QueryContext(ctx, query)
 	if err != nil {

@@ -22,47 +22,206 @@ func TestDownloadFile(t *testing.T) {
 }
 
 func TestValidateDataFromXLSX(t *testing.T) {
-	rows := []models.RowString{
-		models.RowString{
-			OfferID:   "1",
-			Name:      "iphone4",
-			Price:     "10000",
-			Quantity:  "110",
-			Available: "true",
+	type testCase struct {
+		name   string
+		rows   []models.RowString
+		ids    []int
+		insExp int
+		updExp int
+		delExp int
+		errExp int
+	}
+
+	tCases := []testCase{
+		testCase{
+			name:   "test 1",
+			insExp: 3,
+			updExp: 0,
+			delExp: 1,
+			errExp: 1,
+			rows: []models.RowString{
+				models.RowString{
+					OfferID:   "1",
+					Name:      "iphone4",
+					Price:     "10000",
+					Quantity:  "110",
+					Available: "true",
+				},
+				models.RowString{
+					OfferID:   "2",
+					Name:      "iphone5",
+					Price:     "12000",
+					Quantity:  "10",
+					Available: "false",
+				},
+				models.RowString{
+					OfferID:   "-1",
+					Name:      "iphone5",
+					Price:     "12000",
+					Quantity:  "10",
+					Available: "true",
+				},
+				models.RowString{
+					OfferID:   "3",
+					Name:      "iphone5",
+					Price:     "12000",
+					Quantity:  "10",
+					Available: "true",
+				},
+				models.RowString{
+					OfferID:   "4",
+					Name:      "iphone5",
+					Price:     "12000",
+					Quantity:  "10",
+					Available: "true",
+				},
+			},
+			ids: []int{2},
 		},
-		models.RowString{
-			OfferID:   "2",
-			Name:      "iphone5",
-			Price:     "12000",
-			Quantity:  "10",
-			Available: "false",
+		testCase{
+			name:   "test 2",
+			insExp: 2,
+			updExp: 1,
+			delExp: 1,
+			errExp: 1,
+			rows: []models.RowString{
+				models.RowString{
+					OfferID:   "1",
+					Name:      "iphone4",
+					Price:     "10000",
+					Quantity:  "110",
+					Available: "true",
+				},
+				models.RowString{
+					OfferID:   "2",
+					Name:      "iphone5",
+					Price:     "12000",
+					Quantity:  "10",
+					Available: "false",
+				},
+				models.RowString{
+					OfferID:   "-1",
+					Name:      "iphone5",
+					Price:     "12000",
+					Quantity:  "10",
+					Available: "true",
+				},
+				models.RowString{
+					OfferID:   "3",
+					Name:      "iphone5",
+					Price:     "12000",
+					Quantity:  "10",
+					Available: "true",
+				},
+				models.RowString{
+					OfferID:   "4",
+					Name:      "iphone5",
+					Price:     "12000",
+					Quantity:  "10",
+					Available: "true",
+				},
+			},
+			ids: []int{1, 2},
 		},
-		models.RowString{
-			OfferID:   "-1",
-			Name:      "iphone5",
-			Price:     "12000",
-			Quantity:  "10",
-			Available: "true",
+		testCase{
+			name:   "test 2",
+			insExp: 4,
+			updExp: 1,
+			delExp: 0,
+			errExp: 1,
+			rows: []models.RowString{
+				models.RowString{
+					OfferID:   "1",
+					Name:      "iphone4",
+					Price:     "10000",
+					Quantity:  "110",
+					Available: "true",
+				},
+				models.RowString{
+					OfferID:   "2",
+					Name:      "iphone5",
+					Price:     "12000",
+					Quantity:  "10",
+					Available: "false",
+				},
+				models.RowString{
+					OfferID:   "-1",
+					Name:      "iphone5",
+					Price:     "12000",
+					Quantity:  "10",
+					Available: "true",
+				},
+				models.RowString{
+					OfferID:   "3",
+					Name:      "iphone5",
+					Price:     "12000",
+					Quantity:  "10",
+					Available: "true",
+				},
+				models.RowString{
+					OfferID:   "4",
+					Name:      "iphone5",
+					Price:     "12000",
+					Quantity:  "10",
+					Available: "true",
+				},
+			},
+			ids: []int{},
 		},
-		models.RowString{
-			OfferID:   "3",
-			Name:      "iphone5",
-			Price:     "12000",
-			Quantity:  "10",
-			Available: "true",
-		},
-		models.RowString{
-			OfferID:   "4",
-			Name:      "iphone5",
-			Price:     "12000",
-			Quantity:  "10",
-			Available: "true",
+		testCase{
+			name:   "test 2",
+			insExp: 0,
+			updExp: 4,
+			delExp: 1,
+			errExp: 0,
+			rows: []models.RowString{
+				models.RowString{
+					OfferID:   "1",
+					Name:      "iphone4",
+					Price:     "10000",
+					Quantity:  "110",
+					Available: "true",
+				},
+				models.RowString{
+					OfferID:   "2",
+					Name:      "iphone5",
+					Price:     "12000",
+					Quantity:  "10",
+					Available: "false",
+				},
+				models.RowString{
+					OfferID:   "5",
+					Name:      "iphone5",
+					Price:     "12000",
+					Quantity:  "10",
+					Available: "true",
+				},
+				models.RowString{
+					OfferID:   "3",
+					Name:      "iphone5",
+					Price:     "12000",
+					Quantity:  "10",
+					Available: "true",
+				},
+				models.RowString{
+					OfferID:   "4",
+					Name:      "iphone5",
+					Price:     "12000",
+					Quantity:  "10",
+					Available: "true",
+				},
+			},
+			ids: []int{1, 2, 3, 4, 5},
 		},
 	}
 
-	ins, upd, del, err := Validate(rows, []int{2})
-	assert.Len(t, ins, 2)
-	assert.Len(t, upd, 1)
-	assert.Len(t, del, 1)
-	assert.NotZero(t, err)
+	for _, tc := range tCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ins, upd, del, err := Validate(tc.rows, tc.ids)
+			assert.Len(t, ins, tc.insExp)
+			assert.Len(t, upd, tc.updExp)
+			assert.Len(t, del, tc.delExp)
+			assert.Equal(t, err, tc.errExp)
+		})
+	}
 }

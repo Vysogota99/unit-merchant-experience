@@ -81,30 +81,63 @@ func TestWorkerPipeline(t *testing.T) {
 }
 
 func TestGetOffer(t *testing.T) {
+
 	db, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	store := New(db)
 
-	offerID := ""
-	salerID := "1"
-	offer := "ip"
+	type testCase struct {
+		name  string
+		rows  *sqlmock.Rows
+		data  map[string]string
+		query string
+	}
 
-	rows := mock.NewRows(
-		[]string{"id", "saler_id", "name", "price", "quantity"},
-	).AddRow("1", "1", "iphone_X", "40000", "10").
-		AddRow("2", "1", "iphone_XR", "48000", "5")
+	tCases := []testCase{
+		testCase{
+			name: "test 1",
+			rows: mock.NewRows(
+				[]string{"id", "saler_id", "name", "price", "quantity"},
+			).AddRow("1", "1", "iphone_X", "40000", "10").
+				AddRow("2", "1", "iphone_XR", "48000", "5"),
+			data: map[string]string{
+				"offerID": "",
+				"salerID": "1",
+				"offer":   "ip",
+			},
+			query: `
+			SELECT id, saler_id, name, price, quantity
+			FROM offers
+			WHERE saler_id = 1 AND name LIKE '%ip%'
+		`,
+		},
+		testCase{
+			name: "test 2",
+			rows: mock.NewRows(
+				[]string{"id", "saler_id", "name", "price", "quantity"},
+			).AddRow("1", "1", "iphone_X", "40000", "10").
+				AddRow("2", "1", "iphone_XR", "48000", "5"),
+			data: map[string]string{
+				"offerID": "",
+				"salerID": "",
+				"offer":   "",
+			},
+			query: `
+			SELECT id, saler_id, name, price, quantity
+			FROM offers
+		`,
+		},
+	}
 
-	query := `
-		SELECT id, saler_id, name, price, quantity
-		FROM offers
-		WHERE saler_id = 1 AND name LIKE '%ip%'
-	`
+	for _, tc := range tCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mock.ExpectBegin()
+			mock.ExpectQuery(regexp.QuoteMeta(tc.query)).WillReturnRows(tc.rows)
+			mock.ExpectCommit()
 
-	mock.ExpectBegin()
-	mock.ExpectQuery(regexp.QuoteMeta(query)).WillReturnRows(rows)
-	mock.ExpectCommit()
-
-	res, err := store.Offer().GetOffers(context.Background(), offerID, salerID, offer)
-	assert.NotNil(t, res)
-	assert.NoError(t, err)
+			res, err := store.Offer().GetOffers(context.Background(), tc.data["offerID"], tc.data["salerID"], tc.data["offer"])
+			assert.NotNil(t, res)
+			assert.NoError(t, err)
+		})
+	}
 }

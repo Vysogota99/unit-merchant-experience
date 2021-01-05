@@ -10,7 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/Vysogota99/unit-merchant-experience/internal/app/data"
+	"github.com/Vysogota99/unit-merchant-experience/internal/app/store/mock"
 	"github.com/Vysogota99/unit-merchant-experience/internal/app/store/postgres"
 	"github.com/stretchr/testify/assert"
 )
@@ -51,4 +53,49 @@ func TestDownloadFile(t *testing.T) {
 
 	err := data.DownloadFile(filePath, url)
 	assert.NoError(t, err)
+}
+
+func TestGetOffers(t *testing.T) {
+	db, mockDB, err := sqlmock.New()
+	assert.NoError(t, err)
+	store := mock.New(db, mockDB)
+
+	scheduler := newScheduler(nWorkers, store)
+	router := NewRouter(serverPort, store, scheduler)
+
+	type testCase struct {
+		name   string
+		params map[string]string
+		code   int
+	}
+
+	tCases := []testCase{
+		testCase{
+			name: "test1",
+			params: map[string]string{
+				"offer_id": "",
+				"saler_id": "",
+				"offer":    "",
+			},
+			code: 200,
+		},
+		testCase{
+			name: "test2",
+			params: map[string]string{
+				"offer_id": "-1",
+				"saler_id": "asd",
+				"offer":    "",
+			},
+			code: 422,
+		},
+	}
+
+	for _, tc := range tCases {
+		t.Run(tc.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			url := fmt.Sprintf("/offer?offer_id=%s&saler_id=%s&offer=%s", tc.params["offer_id"], tc.params["saler_id"], tc.params["offer"])
+			req, _ := http.NewRequest("GET", url, nil)
+			router.Setup().ServeHTTP(w, req)
+		})
+	}
 }
