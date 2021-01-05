@@ -1,21 +1,19 @@
 package postgres
 
 import (
-	"database/sql"
-
 	"github.com/Vysogota99/unit-merchant-experience/internal/app/store"
 )
 
 // StorePSQL ...
 type StorePSQL struct {
-	offerRepository *offerRepository
-	db              *sql.DB
+	offerRepository  *offerRepository
+	connectionString string
 }
 
 // New - инициализирует Store
-func New(db *sql.DB) *StorePSQL {
+func New(conString string) *StorePSQL {
 	return &StorePSQL{
-		db: db,
+		connectionString: conString,
 	}
 }
 

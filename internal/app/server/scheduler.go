@@ -1,8 +1,10 @@
 package server
 
 import (
+	"crypto/rand"
 	"fmt"
 	"log"
+	"math/big"
 
 	"sync"
 	"time"
@@ -60,8 +62,6 @@ func (s *scheduler) initPull() {
 			result: make(chan *models.WorkerResult),
 			store:  s.store,
 		}
-
-		log.Printf("Стартовал воркер #%d", i)
 		worker.status <- STATUS_SLEEP
 		s.workers[i] = &worker
 		go worker.start(&s.tasks)
@@ -73,13 +73,11 @@ func (s *scheduler) initPull() {
 //			сохраняет в него свой id, для того, чтобы по нему получить результаты работы из map workers
 func (w *worker) start(tasks *chan *task) {
 	for task := range *tasks {
-		log.Printf("Worker #%d начал работу", w.id)
-
 		task.workerID <- w.id
 
 		w.updateStatus(STATUS_DOWNLOAD_FILE)
 
-		filePath := fmt.Sprintf("../static/%d_%d.xlsx", time.Now().Unix(), task.ownerID)
+		filePath := fmt.Sprintf("../static/%d_%d_%d.xlsx", time.Now().Unix(), task.ownerID, newCryptoRand())
 		if err := data.DownloadFile(filePath, task.url); err != nil {
 			w.updateStatus(STATUS_ERR)
 			log.Printf("Worker #%d закончил работу с ошибкой: %s", w.id, err.Error())
@@ -117,11 +115,6 @@ func (w *worker) start(tasks *chan *task) {
 		// запись результатов в бд
 		w.updateStatus(STATUS_DB)
 
-		log.Println("ids: ", ids)
-		log.Println("ins: ", rowsToInsert)
-		log.Println("upd: ", rowsToUpdate)
-		log.Println("del: ", idsToDelete)
-
 		result, err := w.store.Offer().WorkerPipeline(rowsToInsert, rowsToUpdate, idsToDelete, task.ownerID)
 		if err != nil {
 			w.updateStatus(STATUS_ERR)
@@ -136,7 +129,6 @@ func (w *worker) start(tasks *chan *task) {
 
 		w.updateStatus(STATUS_SUCCESS)
 		w.result <- result
-		log.Printf("Worker #%d закончил работу успешно", w.id)
 	}
 }
 
@@ -144,4 +136,12 @@ func (w *worker) start(tasks *chan *task) {
 func (w *worker) updateStatus(newStatus string) {
 	<-w.status
 	w.status <- newStatus
+}
+
+func newCryptoRand() int64 {
+	safeNum, err := rand.Int(rand.Reader, big.NewInt(100234))
+	if err != nil {
+		panic(err)
+	}
+	return safeNum.Int64()
 }

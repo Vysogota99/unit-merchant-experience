@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -24,8 +23,7 @@ const (
 )
 
 func TestFilehandler(t *testing.T) {
-	db, err := sql.Open("postgres", connStringPostgres)
-	store := postgres.New(db)
+	store := postgres.New(connStringPostgres)
 
 	scheduler := newScheduler(nWorkers, store)
 	scheduler.initPull()

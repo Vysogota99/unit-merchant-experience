@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -94,7 +93,6 @@ func (r *Router) fileStatusHandler(c *gin.Context) {
 
 	r.scheduler.mu.Lock()
 
-	log.Printf("Получение статуса воркера #%d", idInt)
 	status := <-worker.status
 
 	// обновляем статус для успешно выполненного воркера, тем самым переводим его в
@@ -104,8 +102,6 @@ func (r *Router) fileStatusHandler(c *gin.Context) {
 	} else {
 		worker.status <- status
 	}
-	log.Printf("статус воркера #%d: %s", idInt, status)
-
 	r.scheduler.mu.Unlock()
 
 	if status == STATUS_ERR {
@@ -114,17 +110,16 @@ func (r *Router) fileStatusHandler(c *gin.Context) {
 			"status": status,
 		}, "")
 	} else if status == STATUS_SLEEP {
-		respond(c, http.StatusOK, map[string]interface{}{
+		respond(c, http.StatusNoContent, map[string]interface{}{
 			"status": status,
 		}, "")
 	} else if status == STATUS_SUCCESS {
-
-		respond(c, http.StatusAccepted, map[string]interface{}{
+		respond(c, http.StatusOK, map[string]interface{}{
 			"status":     status,
 			"статистика": <-worker.result,
 		}, "")
 	} else {
-		respond(c, http.StatusProcessing, map[string]interface{}{
+		respond(c, http.StatusTooEarly, map[string]interface{}{
 			"status": status,
 		}, "")
 	}

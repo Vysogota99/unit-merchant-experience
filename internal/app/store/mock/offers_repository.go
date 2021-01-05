@@ -29,7 +29,7 @@ func (o *offerRepository) GetOffersIDSBySalerID(id int) ([]int, error) {
 	stmt.ExpectQuery().WithArgs(id).WillReturnRows(rows)
 	o.store.mock.ExpectCommit()
 
-	storePostgres := postgres.New(o.store.db)
+	storePostgres := postgres.New("")
 
 	return storePostgres.Offer().GetOffersIDSBySalerID(id)
 }
@@ -56,10 +56,10 @@ func (o *offerRepository) WorkerPipeline(rowsToInsert []models.Row, rowsToUpdate
 func (o *offerRepository) GetOffers(ctx context.Context, offerID, salerID, offer string) ([]models.Row, error) {
 	return []models.Row{
 		models.Row{
-			OfferID: 1,
-			SalerID: 2,
-			Name: "name",
-			Price: 123,
+			OfferID:  1,
+			SalerID:  2,
+			Name:     "name",
+			Price:    123,
 			Quantity: 1,
 		},
 	}, nil

@@ -19,6 +19,13 @@ type offerRepository struct {
 
 // GetOffersIDBySalerID - возвращает массив id товаров определенного продавца
 func (o *offerRepository) GetOffersIDSBySalerID(id int) ([]int, error) {
+	db, err := sql.Open("postgres", o.store.connectionString)
+	if err != nil {
+		return nil, err
+	}
+
+	defer db.Close()
+
 	query := `
 		SELECT id 
 		FROM offers
@@ -27,7 +34,7 @@ func (o *offerRepository) GetOffersIDSBySalerID(id int) ([]int, error) {
 	`
 
 	ctx := context.Background()
-	tx, err := o.store.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	defer tx.Rollback()
 	if err != nil {
 		return nil, err
@@ -95,6 +102,13 @@ func (o *offerRepository) InsertOffers(ctx context.Context, tx *sql.Tx, rows []m
 
 // UpdateOffers ...
 func (o *offerRepository) UpdateOffers(ctx context.Context, tx *sql.Tx, rows []models.Row, salerID int) (int, error) {
+	db, err := sql.Open("postgres", o.store.connectionString)
+	if err != nil {
+		return 0, err
+	}
+
+	defer db.Close()
+
 	if len(rows) == 0 {
 		return 0, nil
 	}
@@ -107,7 +121,7 @@ func (o *offerRepository) UpdateOffers(ctx context.Context, tx *sql.Tx, rows []m
 			WHERE id=$4
 		`
 
-		stmt, err := o.store.db.Prepare(query)
+		stmt, err := db.Prepare(query)
 		if err != nil {
 			return 0, err
 		}
@@ -153,8 +167,15 @@ func (o *offerRepository) DeleteOffers(ctx context.Context, tx *sql.Tx, ids []in
 }
 
 func (o *offerRepository) WorkerPipeline(rowsToInsert []models.Row, rowsToUpdate []models.Row, idsToDelete []int, salerID int) (*models.WorkerResult, error) {
+	db, err := sql.Open("postgres", o.store.connectionString)
+	if err != nil {
+		return nil, err
+	}
+
+	defer db.Close()
+
 	ctx := context.Background()
-	tx, err := o.store.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +208,13 @@ func (o *offerRepository) WorkerPipeline(rowsToInsert []models.Row, rowsToUpdate
 }
 
 func (o *offerRepository) GetOffers(ctx context.Context, offerID, salerID, offer string) ([]models.Row, error) {
-	tx, err := o.store.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	db, err := sql.Open("postgres", o.store.connectionString)
+	if err != nil {
+		return nil, err
+	}
+
+	defer db.Close()
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	defer tx.Rollback()
 	if err != nil {
 		return nil, err
